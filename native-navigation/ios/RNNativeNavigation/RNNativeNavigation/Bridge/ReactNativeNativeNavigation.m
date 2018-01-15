@@ -78,6 +78,32 @@ RCT_EXPORT_METHOD(setSiteMap:
     resolve(@[]);
 }
 
+RCT_EXPORT_METHOD(callMethodOnNode:
+    (NSString *) path
+            methodName:
+            (NSString *) methodName
+            arguments:
+            (NSDictionary *) arguments
+            responseCallback:
+            (RCTResponseSenderBlock) callback) {
+
+    NNSingleNode *nodeObject = [NNNodeHelper.sharedInstance nodeFromMap:arguments[@"screen"] bridge:self.bridge];
+
+    UIViewController <NNView> *rootController = (UIViewController <NNView> *) [UIApplication sharedApplication].keyWindow.rootViewController;
+    NSString *parentPath = nodeObject.screenID;
+    UIViewController <NNView> *findController = [rootController viewForPath:parentPath];
+    if(!findController) return;
+
+    NSMutableDictionary *newArguemnts = @{}.mutableCopy;
+    newArguemnts[@"bridge"] = self.bridge;
+    [newArguemnts addEntriesFromDictionary:arguments];
+
+    [findController callMethodWithName:methodName arguments:newArguemnts callback:^(NSArray *array) {
+        callback(array);
+    }];
+
+}
+
 RCT_EXPORT_METHOD(openView:
     (NSDictionary *) screen
             registerCallback:
@@ -102,60 +128,6 @@ RCT_EXPORT_METHOD(openView:
         UIViewController *viewController = [nodeObject generate];
         if (viewController) {
             [drawerView setCenterViewController:viewController withCloseAnimation:YES completion:nil];
-        }
-    });
-}
-
-RCT_EXPORT_METHOD(push:
-    (NSDictionary *) screen
-            registerCallback:
-            (RCTResponseSenderBlock) callback) {
-    NNSingleNode *nodeObject = [NNNodeHelper.sharedInstance nodeFromMap:screen bridge:self.bridge];
-
-    UIViewController <NNView> *rootController = (UIViewController <NNView> *) [UIApplication sharedApplication].keyWindow.rootViewController;
-    UIViewController <NNView> *findController = [rootController viewForPath:nodeObject.screenID.stringByDeletingLastPathComponent];
-    if (!findController) return;
-
-    UINavigationController <NNView> *navigationController = (UINavigationController <NNView> *) findController.navigationController;
-    NNStackNode *stackNode = navigationController.node;
-    NSMutableArray *stack = stackNode.stack.mutableCopy;
-    [stack addObject:nodeObject];
-    stackNode.stack = stack;
-
-    NSDictionary *newState = rootController.node.data;
-    [RNNNState sharedInstance].state = newState;
-    callback(@[newState]);
-
-    dispatch_async(dispatch_get_main_queue(), ^{
-        UIViewController *viewController = [nodeObject generate];
-        if (navigationController && viewController) {
-            [navigationController pushViewController:viewController animated:YES];
-        }
-    });
-}
-
-RCT_EXPORT_METHOD(showModal:
-    (NSDictionary *) screen
-            registerCallback:
-            (RCTResponseSenderBlock) callback) {
-    NNSingleNode *nodeObject = [NNNodeHelper.sharedInstance nodeFromMap:screen bridge:self.bridge];
-
-    UIViewController <NNView> *rootController = (UIViewController <NNView> *) [UIApplication sharedApplication].keyWindow.rootViewController;
-    NSString *parentPath = nodeObject.screenID.stringByDeletingLastPathComponent.stringByDeletingLastPathComponent;
-    NNSingleView *findController = (NNSingleView *) [rootController viewForPath:parentPath];
-    if (!findController) return;
-
-    NNSingleNode *singleNode = findController.node;
-    singleNode.modal = nodeObject;
-
-    NSDictionary *newState = rootController.node.data;
-    [RNNNState sharedInstance].state = newState;
-    callback(@[newState]);
-
-    dispatch_async(dispatch_get_main_queue(), ^{
-        UIViewController *viewController = [nodeObject generate];
-        if (viewController) {
-            [findController presentViewController:viewController animated:YES completion:nil];
         }
     });
 }
